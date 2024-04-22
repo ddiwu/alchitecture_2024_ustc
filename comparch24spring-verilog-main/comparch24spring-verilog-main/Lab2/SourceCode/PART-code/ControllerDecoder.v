@@ -384,9 +384,68 @@ module ControllerDecoder(
                 cache_write_en = 4'b0000;
             end
         end
-
-        /* CSR ~ ~ ~ */
-
+        else if(opcode == `I_CSR)
+        begin
+            jal = 0;
+            jalr = 0;
+            op1_src = 0;
+            op2_src = 0;
+            br_type = 0;
+            load_npc = 0;
+            wb_select = 0;
+            load_type = 0;
+            cache_write_en = 0;
+            imm_type = 0;
+            if (funct3 == `I_CSRRW)
+            begin
+                ALU_func = `OP1;
+                CSR_zimm_or_reg = 0;
+                reg_write_en = 1;
+                CSR_write_en = 1;
+            end
+            else if (funct3 == `I_CSRRS)
+            begin
+                ALU_func = `OR;
+                CSR_zimm_or_reg = 0;
+                reg_write_en = 1;
+                CSR_write_en = 1;
+            end
+            else if (funct3 == `I_CSRRC)
+            begin
+                ALU_func = `OP2;
+                CSR_zimm_or_reg = 0;
+                reg_write_en = 1;
+                CSR_write_en = 1;
+            end
+            else if (funct3 == `I_CSRRWI)
+            begin
+                ALU_func = `OP1;
+                CSR_zimm_or_reg = 1;
+                reg_write_en = 1;
+                CSR_write_en = 1;
+            end
+            else if (funct3 == `I_CSRRSI)
+            begin
+                ALU_func = `OR;
+                CSR_zimm_or_reg = 1;
+                reg_write_en = 1;
+                CSR_write_en = 1;
+            end
+            else if (funct3 == `I_CSRRCI)
+            begin
+                ALU_func = `OP2;
+                CSR_zimm_or_reg = 1;
+                reg_write_en = 1;
+                CSR_write_en = 1;
+            end
+            else 
+            begin
+                ALU_func = 0;
+                CSR_zimm_or_reg = 0;
+                CSR_write_en = 0;
+                reg_write_en = 0;
+            end
+        end
         else 
         begin
             jal = 0;

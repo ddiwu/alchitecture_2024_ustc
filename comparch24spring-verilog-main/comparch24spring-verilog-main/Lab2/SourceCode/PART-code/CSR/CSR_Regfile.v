@@ -12,8 +12,27 @@ module CSR_Regfile(
     output wire [31:0] CSR_data_read
     );
     
-    // TODO: Complete this module
+    integer i;
+    reg [31:0] regfile[4095:0];
 
-    /* FIXME: Write your code here... */
+    initial begin
+        for (i=0; i<4096; i=i+1)
+            regfile[i] = 32'h0;
+    end
+
+    always@(posedge clk or posedge rst)
+    begin
+        if(rst)
+        begin
+            for (i=0; i<4096; i=i+1)
+                regfile[i] <= 32'h0;
+        end
+        else if(CSR_write_en)
+        begin
+            regfile[CSR_write_addr] <= CSR_data_write;
+        end
+    end
+
+    assign CSR_data_read = regfile[CSR_read_addr];
 
 endmodule
