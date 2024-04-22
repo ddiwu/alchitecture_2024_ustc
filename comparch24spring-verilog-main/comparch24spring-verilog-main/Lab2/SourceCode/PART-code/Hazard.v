@@ -45,7 +45,7 @@ module HarzardUnit(
     output reg [1:0] op1_sel, op2_sel
     );
 
-    // TODO: Complete this module
+    // DO: Complete this module
 
 
     // generate op1_sel
