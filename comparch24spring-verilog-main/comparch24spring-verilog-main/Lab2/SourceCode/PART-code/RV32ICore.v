@@ -16,6 +16,33 @@ module RV32ICore(
     input wire [ 3:0] CPU_Debug_InstCache_WE2,
     output wire [31:0] CPU_Debug_InstCache_RD2
     );
+
+    wire miss;
+    reg miss_last;
+    wire miss_edge;
+    wire rw;
+    reg [31:0] miss_cnt;
+    reg [31:0] rw_cnt;
+
+    assign miss_edge = miss & ~miss_last;
+
+    //统计
+    always @ (posedge CPU_CLK or posedge CPU_RST)
+    begin
+        if(CPU_RST)
+        begin
+            miss_cnt <= 0;
+            rw_cnt <= 0;
+        end
+        else
+        begin
+            miss_last <= miss;
+            if(miss_edge)
+                miss_cnt <= miss_cnt + 1;
+            if(rw)
+                rw_cnt <= rw_cnt + 1;
+        end
+    end 
     
 	//wire values definitions
     wire bubbleF, flushF, bubbleD, flushD, bubbleE, flushE, bubbleM, flushM, bubbleW, flushW;
@@ -388,7 +415,9 @@ module RV32ICore(
         .in_data(reg2_MEM),
         .debug_in_data(CPU_Debug_DataCache_WD2),
         .debug_out_data(CPU_Debug_DataCache_RD2),
-        .data_WB(data_WB)
+        .data_WB(data_WB),
+        .miss(miss),
+        .rw(rw)
     );
 
 
@@ -446,7 +475,8 @@ module RV32ICore(
         .flushW(flushW),
         .bubbleW(bubbleW),
         .op1_sel(op1_sel),
-        .op2_sel(op2_sel)
+        .op2_sel(op2_sel),
+        .miss(miss)
     );  
     	         
 endmodule

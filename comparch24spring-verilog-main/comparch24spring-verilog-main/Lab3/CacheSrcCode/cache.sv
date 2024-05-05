@@ -1,5 +1,5 @@
-
-
+`define LRU
+//写回写分配：未命中时，将主存中的line读入cache，写入cache
 module cache #(
     parameter  LINE_ADDR_LEN = 3, // line内地址长度，决定了每个line具有2^3个word
     parameter  SET_ADDR_LEN  = 3, // 组地址长度，决定了一共有2^3=8组
@@ -8,6 +8,7 @@ module cache #(
 )(
     input  clk, rst,
     output miss,               // 对CPU发出的miss信号
+    output rw,
     input  [31:0] addr,        // 读写请求地址
     input  rd_req,             // 读请求信号
     output reg [31:0] rd_data, // 读出的数据，一次读一个word
@@ -20,8 +21,6 @@ localparam UNUSED_ADDR_LEN = 32 - TAG_ADDR_LEN - SET_ADDR_LEN - LINE_ADDR_LEN - 
 
 localparam LINE_SIZE       = 1 << LINE_ADDR_LEN  ;         // 计算 line 中 word 的数量，即 2^LINE_ADDR_LEN 个word 每 line
 localparam SET_SIZE        = 1 << SET_ADDR_LEN   ;         // 计算一共有多少组，即 2^SET_ADDR_LEN 个组
-
-reg LRU_or_FIFO = 1'b1;   // 1代表LRU，0代表FIFO
 
 reg [            31:0] cache_mem    [SET_SIZE][WAY_CNT][LINE_SIZE]; // SET_SIZE个line，每个line有LINE_SIZE个word
 reg [TAG_ADDR_LEN-1:0] cache_tags   [SET_SIZE][WAY_CNT];            // SET_SIZE个TAG
@@ -45,15 +44,28 @@ reg  [   MEM_ADDR_LEN-1:0] mem_wr_addr = 0;
 reg  [31:0] mem_wr_line [LINE_SIZE];
 wire [31:0] mem_rd_line [LINE_SIZE];
 
+reg cache_hit = 1'b0;
+reg [31:0] way_addr = 0;//是数字表示多个line，为方便，直接取了32位
+reg [31:0] way_addr_last = 0;
+// reg FIFO_record[SET_SIZE][WAY_CNT];//FIFO记录
+// reg free;
+
 wire mem_gnt;      // 主存响应读写的握手信号
 
 assign {unused_addr, tag_addr, set_addr, line_addr, word_addr} = addr;  // 拆分 32bit ADDR
 
 reg [31:0] LFtime [SET_SIZE][WAY_CNT];//用于LRU
+initial begin
+    for (integer j = 0; j < SET_SIZE; j++)begin
+    for (integer i = 0; i < WAY_CNT; i++)
+    begin
+        LFtime[j][i] = 32'b0;
+    end
+end
+end
 
 wire rd, wr;
 reg rd_req_last, wr_req_last;
-reg rw;
 always @(posedge clk or posedge rst)
 begin
     if(rst) 
@@ -69,57 +81,7 @@ begin
 end
 assign rd = rd_req & ~rd_req_last;
 assign wr = wr_req & ~wr_req_last; //取边沿避免重复
-assign rw = rd_req_last | wr_req_last;
-
-always @(posedge clk or posedge rst) begin
-    if (rst) 
-    begin
-        for(integer i = 0; i < SET_SIZE; i++) 
-        begin
-            for (integer j = 0; j < WAY_CNT; j++) 
-            begin
-                LFtime[i][j] <= 32'b0;
-            end
-        end
-    end
-    else if (LRU_or_FIFO)//使用LRU
-    begin
-        if (rw && cache_hit)
-        begin
-            for (integer k = 0; k < WAY_CNT; k++)
-            begin
-                if (k == way_addr)
-                    LFtime[set_addr][k] <= 32'b0;
-                else LFtime[set_addr][k] <= LFtime[set_addr][k] + 1;
-            end
-        end
-        else if (cache_stat == SWAP_IN_OK)
-        begin
-            for (integer k = 0; k < WAY_CNT; k++)
-            begin
-                if (k == way_addr_last)
-                    LFtime[mem_rd_set_addr][k] <= 32'b0;
-                else LFtime[mem_rd_set_addr][k] <= LFtime[mem_rd_set_addr][k] + 1;
-            end
-        end
-    end
-    else //使用FIFO,这是不同选择，所以复用时间；如果可以，可以维护一个FIFO循环数组，然后用一个i指示位置即可；或者用近似LRU，FIFO同时维护一个1bit机会
-    begin
-        if (cache_stat == SWAP_IN_OK)
-        begin
-            for (integer k = 0; k < WAY_CNT; k++)
-            begin
-                if (k == way_addr_last)
-                    LFtime[mem_rd_set_addr][k] <= 32'b0;
-                else LFtime[mem_rd_set_addr][k] <= LFtime[mem_rd_set_addr][k] + 1;
-            end
-        end
-    end
-end
-
-reg cache_hit = 1'b0;
-reg [31:0] way_addr = 0;//是数字表示多个line，为方便，直接取了32位
-reg [31:0] way_addr_last = 0;
+assign rw = rd | wr;
 
 always @ (*) begin              // 判断 输入的address 是否在 cache 中命中
     cache_hit = 0;
@@ -135,6 +97,7 @@ always @ (*) begin              // 判断 输入的address 是否在 cache 中�
     if (!cache_hit)//前面设置的所有time都增长，所以此处不用考虑未填情况
     begin
         way_addr = 0;
+        // `ifdef LRU
         for (integer i = 0; i < WAY_CNT; i++)
         begin
             if (LFtime[set_addr][i] > LFtime[set_addr][way_addr])
@@ -142,6 +105,59 @@ always @ (*) begin              // 判断 输入的address 是否在 cache 中�
         end
     end
 end
+
+always @(posedge clk or posedge rst) begin
+    if (rst) 
+    begin
+        for(integer i = 0; i < SET_SIZE; i++) 
+        begin
+            for (integer j = 0; j < WAY_CNT; j++) 
+            begin
+                LFtime[i][j] <= 32'b0;
+            end
+        end
+    end
+    `ifdef LRU
+    else //使用LRU
+    begin
+        if (rw && cache_stat == IDLE && cache_hit)
+        begin
+            for (integer k = 0; k < WAY_CNT; k++)
+            begin
+                if (k == way_addr)
+                    LFtime[set_addr][k] <= 32'b0;
+                else LFtime[set_addr][k] <= LFtime[set_addr][k] + 1;
+            end
+        end
+        else if (cache_stat == SWAP_IN_OK)
+        begin
+            for (integer k = 0; k < WAY_CNT; k++)
+            begin
+                if (k == way_addr_last)
+                    LFtime[set_addr][k] <= 32'b0;
+                else LFtime[set_addr][k] <= LFtime[set_addr][k] + 1;
+            end
+        end
+    end
+    `else
+    else //使用FIFO,这是不同选择，所以复用时间；如果可以，可以维护一个FIFO循环数组，然后用一个i指示位置即可；
+    begin
+        if (cache_stat == SWAP_IN_OK)
+        begin
+            for (integer k = 0; k < WAY_CNT; k++)
+            begin
+                if (k == way_addr_last)
+                    LFtime[set_addr][k] <= 32'b0;
+                else LFtime[set_addr][k] <= LFtime[set_addr][k] + 1;
+            end
+        end
+    end
+    `endif
+end
+
+
+
+
 
 
 
@@ -178,7 +194,7 @@ always @ (posedge clk or posedge rst) begin     // ?? cache ???
                                 end else begin                                   // 反之，不需要换出，直接换入
                                     cache_stat  <= SWAP_IN;
                                 end
-                                {mem_rd_tag_addr, mem_rd_set_addr} <= {tag_addr, set_addr};
+                                {mem_rd_tag_addr, mem_rd_set_addr, way_addr_last} <= {tag_addr, set_addr, way_addr};
                             end
                         end
                     end
@@ -190,7 +206,7 @@ always @ (posedge clk or posedge rst) begin     // ?? cache ???
         SWAP_IN:    begin
                         if(mem_gnt) begin           // 如果主存握手信号有效，说明换入成功，跳到下一状态
                             cache_stat <= SWAP_IN_OK;
-                            way_addr_last <= way_addr;//写入cache后由于组合逻辑，way_addr会变，所以需要保存
+                            // way_addr_last <= way_addr;//写入cache后由于组合逻辑，way_addr会变，所以需要保存
                         end
                     end
         SWAP_IN_OK: begin           // 上一个周期换入成功，这周期将主存读出的line写入cache，并更新tag，置高valid，置低dirty

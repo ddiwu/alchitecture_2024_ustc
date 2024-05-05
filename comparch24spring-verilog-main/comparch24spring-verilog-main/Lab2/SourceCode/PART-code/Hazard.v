@@ -42,7 +42,8 @@ module HarzardUnit(
     input wire reg_write_en_MEM,
     input wire reg_write_en_WB,
     output reg flushF, bubbleF, flushD, bubbleD, flushE, bubbleE, flushM, bubbleM, flushW, bubbleW,
-    output reg [1:0] op1_sel, op2_sel
+    output reg [1:0] op1_sel, op2_sel,
+    input wire miss
     );
 
     // DO: Complete this module
@@ -98,7 +99,16 @@ module HarzardUnit(
         end
         else 
         begin
-            if (wb_select == 1 && (reg_dstE == reg1_srcD || reg_dstE == reg2_srcD))// load-'use' wb为取且后面用，停止一次
+            if (miss)
+            begin
+                bubbleF = 1;
+                flushF = 0;
+                bubbleD = 1;
+                flushD = 0;
+                bubbleE = 1;
+                flushE = 0;
+            end
+            else if (wb_select == 1 && (reg_dstE == reg1_srcD || reg_dstE == reg2_srcD))// load-'use' wb为取且后面用，停止一次
             begin
                 bubbleF = 1;
                 flushF = 0;
@@ -154,6 +164,11 @@ module HarzardUnit(
             bubbleM = 0;
             flushM = 1;
         end
+        else if(miss)
+        begin
+            bubbleM = 1;
+            flushM = 0;
+        end
         else 
         begin
             bubbleM = 0;
@@ -161,13 +176,18 @@ module HarzardUnit(
         end
     end
 
-    // generate bubbleW and flushW no need!
+    // generate bubbleW and flushW,取的数从M->W，要停掉流水线
     always @ (*)
     begin
         if (rst)
         begin
             bubbleW = 0;
             flushW = 1;
+        end
+        else if (miss)
+        begin
+            bubbleW = 1;
+            flushW = 0;
         end
         else 
         begin

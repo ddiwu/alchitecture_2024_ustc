@@ -29,22 +29,42 @@ module WB_Data_WB(
     input  [31:0] debug_addr,
     input  [31:0] in_data, debug_in_data,
     output wire [31:0] debug_out_data,
-    output wire [31:0] data_WB
+    output wire [31:0] data_WB,
+    output wire miss,
+    output wire rw
     );
 
     wire [31:0] data_raw;
     wire [31:0] data_WB_raw;
 
-    DataCache DataCache1(
+    // DataCache DataCache1(
+    //     .clk(clk),
+    //     .write_en(write_en << addr[1:0]),
+    //     .debug_write_en(debug_write_en),
+    //     .addr(addr[31:2]),
+    //     .debug_addr(debug_addr[31:2]),
+    //     .in_data(in_data << (8 * addr[1:0])),
+    //     .debug_in_data(debug_in_data),
+    //     .out_data(data_raw),
+    //     .debug_out_data(debug_out_data)
+    // );
+
+    cache # (
+    .LINE_ADDR_LEN(3),
+    .SET_ADDR_LEN(3),
+    .TAG_ADDR_LEN(6),
+    .WAY_CNT(4)
+    )
+    cache_inst (
         .clk(clk),
-        .write_en(write_en << addr[1:0]),
-        .debug_write_en(debug_write_en),
-        .addr(addr[31:2]),
-        .debug_addr(debug_addr[31:2]),
-        .in_data(in_data << (8 * addr[1:0])),
-        .debug_in_data(debug_in_data),
-        .out_data(data_raw),
-        .debug_out_data(debug_out_data)
+        .rst(rst),
+        .miss(miss),
+        .rw(rw),
+        .addr(addr),
+        .rd_req(wb_select),
+        .rd_data(data_raw),
+        .wr_req(write_en == 4'b1111),
+        .wr_data(in_data)//只考虑写一整个字
     );
 
     // Add flush and bubble support
