@@ -30,9 +30,11 @@ module WB_Data_WB(
     input  [31:0] in_data, debug_in_data,
     output wire [31:0] debug_out_data,
     output wire [31:0] data_WB,
+    input wire rst,
     output wire miss,
     output wire rw
     );
+    
 
     wire [31:0] data_raw;
     wire [31:0] data_WB_raw;
@@ -53,7 +55,7 @@ module WB_Data_WB(
     .LINE_ADDR_LEN(3),
     .SET_ADDR_LEN(3),
     .TAG_ADDR_LEN(6),
-    .WAY_CNT(4)
+    .WAY_CNT(2)
     )
     cache_inst (
         .clk(clk),

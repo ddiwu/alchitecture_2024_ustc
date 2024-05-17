@@ -1,4 +1,4 @@
-`define LRU
+//`define LRU
 //写回写分配：未命中时，将主存中的line读入cache，写入cache
 module cache #(
     parameter  LINE_ADDR_LEN = 3, // line内地址长度，决定了每个line具有2^3个word
@@ -53,13 +53,35 @@ reg [31:0] way_addr_last = 0;
 wire mem_gnt;      // 主存响应读写的握手信号
 
 assign {unused_addr, tag_addr, set_addr, line_addr, word_addr} = addr;  // 拆分 32bit ADDR
-
+`ifdef LRU
 reg [31:0] LFtime [SET_SIZE][WAY_CNT];//用于LRU
 initial begin
     for (integer j = 0; j < SET_SIZE; j++)begin
     for (integer i = 0; i < WAY_CNT; i++)
     begin
         LFtime[j][i] = 32'b0;
+    end
+end
+end
+`else
+reg [2:0] order [SET_SIZE];//用于FIFO
+initial begin
+    for (integer i = 0; i < SET_SIZE; i++)
+    begin
+        order[i] = 0;
+    end
+end
+`endif
+
+initial begin
+    for (integer i = 0; i < SET_SIZE; i++)begin
+    for (integer j = 0; j < WAY_CNT; j++)
+    begin
+        for (integer k = 0; k < LINE_SIZE; k++)
+            cache_mem[i][j][k] = 0;
+        cache_tags[i][j] = 0;
+        valid[i][j] = 0;
+        dirty[i][j] = 0;
     end
 end
 end
@@ -97,17 +119,21 @@ always @ (*) begin              // 判断 输入的address 是否在 cache 中�
     if (!cache_hit)//前面设置的所有time都增长，所以此处不用考虑未填情况
     begin
         way_addr = 0;
-        // `ifdef LRU
+        `ifdef LRU
         for (integer i = 0; i < WAY_CNT; i++)
         begin
             if (LFtime[set_addr][i] > LFtime[set_addr][way_addr])
                 way_addr = i;//要在一个always块中
         end
+        `else
+            way_addr = order[set_addr];
+        `endif
     end
 end
 
 always @(posedge clk or posedge rst) begin
     if (rst) 
+    `ifdef LRU
     begin
         for(integer i = 0; i < SET_SIZE; i++) 
         begin
@@ -117,6 +143,14 @@ always @(posedge clk or posedge rst) begin
             end
         end
     end
+    `else
+    begin
+        for(integer i = 0; i < SET_SIZE; i++) 
+        begin
+            order[i] = 0;
+        end
+    end
+    `endif
     `ifdef LRU
     else //使用LRU
     begin
@@ -140,26 +174,24 @@ always @(posedge clk or posedge rst) begin
         end
     end
     `else
-    else //使用FIFO,这是不同选择，所以复用时间；如果可以，可以维护一个FIFO循环数组，然后用一个i指示位置即可；
+    else //使用FIFO,这是不同选择，所以复用时间；如果可以，可以维护bit数表明同一组不同路哪个是最早的or用循环的移位寄存器（因为每次改变都是头部的，而LRU会随机访问）
     begin
-        if (cache_stat == SWAP_IN_OK)
+        // if (cache_stat == SWAP_IN_OK)
+        // begin
+        //     for (integer k = 0; k < WAY_CNT; k++)
+        //     begin
+        //         if (k == way_addr_last)
+        //             LFtime[set_addr][k] <= 32'b0;
+        //         else LFtime[set_addr][k] <= LFtime[set_addr][k] + 1;
+        //     end
+        // end
+        if(cache_stat == SWAP_IN_OK)
         begin
-            for (integer k = 0; k < WAY_CNT; k++)
-            begin
-                if (k == way_addr_last)
-                    LFtime[set_addr][k] <= 32'b0;
-                else LFtime[set_addr][k] <= LFtime[set_addr][k] + 1;
-            end
+            order[set_addr] = (order[set_addr] + 1) % WAY_CNT;
         end
     end
     `endif
 end
-
-
-
-
-
-
 
 always @ (posedge clk or posedge rst) begin     // ?? cache ???
     if(rst) begin

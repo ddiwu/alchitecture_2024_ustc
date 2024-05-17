@@ -416,6 +416,7 @@ module RV32ICore(
         .debug_in_data(CPU_Debug_DataCache_WD2),
         .debug_out_data(CPU_Debug_DataCache_RD2),
         .data_WB(data_WB),
+        .rst(CPU_RST),
         .miss(miss),
         .rw(rw)
     );
