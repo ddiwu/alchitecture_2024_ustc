@@ -13,8 +13,9 @@
 
 module PC_ID(
     input wire clk, bubbleD, flushD,
-    input wire [31:0] PC_IF,
-    output reg [31:0] PC_ID
+    input wire [31:0] PC_IF, NPC,
+    output reg [31:0] PC_ID,
+    output reg [31:0] NPC_ID
     );
 
     initial PC_ID = 0;
@@ -23,9 +24,15 @@ module PC_ID(
         if (!bubbleD) 
         begin
             if (flushD)
+            begin
                 PC_ID <= 0;
+                NPC_ID <= 0;
+            end
             else 
+            begin
                 PC_ID <= PC_IF;
+                NPC_ID <= NPC;
+            end
         end
     
 endmodule

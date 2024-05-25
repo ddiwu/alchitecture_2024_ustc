@@ -43,7 +43,8 @@ module HarzardUnit(
     input wire reg_write_en_WB,
     output reg flushF, bubbleF, flushD, bubbleD, flushE, bubbleE, flushM, bubbleM, flushW, bubbleW,
     output reg [1:0] op1_sel, op2_sel,
-    input wire miss
+    input wire miss,
+    input wire br_fail
     );
 
     // DO: Complete this module
@@ -117,7 +118,7 @@ module HarzardUnit(
                 bubbleE = 0;
                 flushE = 1;
             end
-            else if (br == 1)// br清空下两条指令
+            else if (br_fail == 1)// br清空下两条指令
             begin
                 bubbleF = 0;
                 flushF = 0;

@@ -47,9 +47,9 @@ module RV32ICore(
 	//wire values definitions
     wire bubbleF, flushF, bubbleD, flushD, bubbleE, flushE, bubbleM, flushM, bubbleW, flushW;
     wire [31:0] jal_target, br_target;
-    wire jal, br;
+    wire jal, br, br_fail;
     wire jalr_ID, jalr_EX;
-    wire [31:0] NPC, PC_IF, PC_4, PC_ID, PC_EX;
+    wire [31:0] NPC, NPC_ID, NPC_EX, PC_IF, PC_4, PC_ID, PC_EX;
     wire [31:0] inst_ID;
     wire reg_write_en_ID, reg_write_en_EX, reg_write_en_MEM, reg_write_en_WB;
     wire [4:0] reg1_src_EX;
@@ -138,14 +138,22 @@ module RV32ICore(
 
 
     NPC_Generator NPC_Generator1(
+        .clk(CPU_CLK),
         .PC(PC_4),
         .jal_target(jal_target),
         .jalr_target(ALU_out),
         .br_target(br_target),
+        .flushF(flushF),
+        .bubbleE(bubbleE),
+        .br_type_EX(br_type_EX),
+        .PC_EX(PC_EX-4),//因为PC+4赋给PC_ID，所以-4才能还原PC
+        .PC_IF(PC_IF),
+        .NPC_EX(NPC_EX),
         .jal(jal),
         .jalr(jalr_EX),
         .br(br),
-        .NPC(NPC)
+        .NPC(NPC),
+        .br_fail(br_fail)
     );
 
 
@@ -168,7 +176,9 @@ module RV32ICore(
         .bubbleD(bubbleD),
         .flushD(flushD),
         .PC_IF(PC_4),
-        .PC_ID(PC_ID)
+        .NPC(NPC),
+        .PC_ID(PC_ID),
+        .NPC_ID(NPC_ID)
     );
 
 
@@ -248,7 +258,9 @@ module RV32ICore(
         .bubbleE(bubbleE),
         .flushE(flushE),
         .PC_ID(PC_ID),
-        .PC_EX(PC_EX)
+        .NPC_ID(NPC_ID),
+        .PC_EX(PC_EX),
+        .NPC_EX(NPC_EX)
     );
 
     BR_Target_EX BR_Target_EX1(
@@ -477,7 +489,8 @@ module RV32ICore(
         .bubbleW(bubbleW),
         .op1_sel(op1_sel),
         .op2_sel(op2_sel),
-        .miss(miss)
+        .miss(miss),
+        .br_fail(br_fail)
     );  
     	         
 endmodule
