@@ -14,8 +14,8 @@
     // NPC               下一条执行的指令地址
 // 实验要求  
     // finish
-//`define BTB
-`define BHT
+`define BTB
+//`define BHT
 module NPC_Generator(
     input wire clk,
     input wire [31:0] PC, jal_target, jalr_target, br_target,
